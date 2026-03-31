@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RainbowKitProvider, getDefaultConfig } from "@rainbow-me/rainbowkit";
-import { WagmiProvider } from "wagmi";
+import { WagmiProvider, createConfig } from "wagmi";
+import { injected } from "wagmi/connectors";
 import { http } from "viem";
 import { SessionProvider } from "next-auth/react";
 
@@ -19,9 +19,10 @@ const rootstockTestnet = {
   }
 };
 
-const config = getDefaultConfig({
-  appName: "PRStake MVP",
-  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "demo-project-id",
+const config = createConfig({
+  connectors: [
+    injected()
+  ],
   chains: [rootstockTestnet],
   transports: {
     [rootstockTestnet.id]: http(process.env.NEXT_PUBLIC_RPC_URL || "https://public-node.testnet.rsk.co")
@@ -35,9 +36,7 @@ export function Providers({ children }) {
   return (
     <SessionProvider>
       <WagmiProvider config={config}>
-        <QueryClientProvider client={queryClient}>
-          <RainbowKitProvider>{children}</RainbowKitProvider>
-        </QueryClientProvider>
+        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
       </WagmiProvider>
     </SessionProvider>
   );

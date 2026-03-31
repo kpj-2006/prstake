@@ -1,16 +1,29 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { parseUnits, formatUnits } from "viem";
 import { signIn, signOut, useSession } from "next-auth/react";
-import { useAccount, useReadContract, useSignMessage, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import {
+  useAccount,
+  useChainId,
+  useConnect,
+  useDisconnect,
+  useReadContract,
+  useSignMessage,
+  useSwitchChain,
+  useWaitForTransactionReceipt,
+  useWriteContract
+} from "wagmi";
 import { SIGN_MESSAGE_PREFIX, VAULT_ADDRESS } from "@/src/lib/config";
 import vaultAbi from "@/src/lib/abi/PRStakeVault.json";
 
 export default function HomePage() {
   const { data: session, status: sessionStatus } = useSession();
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
+  const { connect, connectors, isPending: connecting } = useConnect();
+  const { disconnect } = useDisconnect();
+  const { switchChainAsync, isPending: switchingChain } = useSwitchChain();
   const [depositAmount, setDepositAmount] = useState("0.01");
   const [boundWallet, setBoundWallet] = useState(null);
   const [feedback, setFeedback] = useState("");
@@ -38,8 +51,29 @@ export default function HomePage() {
 
   const formattedDeposit = useMemo(() => formatUnits(depositRaw, 18), [depositRaw]);
   const claimDisabled = !isConnected || !isBound || openCount !== 0n || depositRaw === 0n || txPending || txConfirming;
+  const isCorrectChain = chainId === 31;
   const githubUsername = session?.user?.githubUsername;
   const isBound = !!(boundWallet && address && boundWallet.toLowerCase() === address.toLowerCase());
+
+  async function addRootstockTestnet() {
+    if (!window.ethereum) return;
+    await window.ethereum.request({
+      method: "wallet_addEthereumChain",
+      params: [
+        {
+          chainId: "0x1f",
+          chainName: "Rootstock Testnet",
+          nativeCurrency: {
+            name: "Test RBTC",
+            symbol: "tRBTC",
+            decimals: 18
+          },
+          rpcUrls: [process.env.NEXT_PUBLIC_RPC_URL || "https://public-node.testnet.rsk.co"],
+          blockExplorerUrls: ["https://explorer.testnet.rsk.co"]
+        }
+      ]
+    });
+  }
 
   useEffect(() => {
     async function loadBinding() {
@@ -156,7 +190,33 @@ export default function HomePage() {
       {session ? (
         <section className="card">
           <h3>Step 2 - Connect wallet</h3>
-          <ConnectButton />
+          {isConnected ? (
+            <div className="row">
+              <p style={{ margin: 0 }}>Connected: {address}</p>
+              <button className="btn secondary" onClick={() => disconnect()}>
+                Disconnect Wallet
+              </button>
+            </div>
+          ) : (
+            <button
+              className="btn"
+              onClick={() => connect({ connector: connectors[0] })}
+              disabled={connecting || connectors.length === 0}
+            >
+              {connecting ? "Connecting..." : "Connect MetaMask"}
+            </button>
+          )}
+
+          {isConnected && !isCorrectChain ? (
+            <div className="row" style={{ marginTop: 10 }}>
+              <button className="btn" onClick={() => switchChainAsync({ chainId: 31 })} disabled={switchingChain}>
+                {switchingChain ? "Switching..." : "Switch to Rootstock Testnet"}
+              </button>
+              <button className="btn secondary" onClick={addRootstockTestnet}>
+                Add Rootstock to MetaMask
+              </button>
+            </div>
+          ) : null}
         </section>
       ) : null}
 
@@ -183,7 +243,7 @@ export default function HomePage() {
             <button
               className="btn"
               onClick={handleDeposit}
-              disabled={!session || !isConnected || !isBound || txPending || txConfirming}
+              disabled={!session || !isConnected || !isCorrectChain || !isBound || txPending || txConfirming}
             >
               {txPending || txConfirming ? "Submitting..." : "Deposit tRBTC"}
             </button>
