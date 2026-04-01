@@ -1,4 +1,4 @@
-# PRStake 
+# PRStake MVV
 
 Minimal MVP for one idea:
 
