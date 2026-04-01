@@ -62,8 +62,10 @@ jobs:
           VAULT_ADDRESS: ${{ vars.VAULT_ADDRESS }}
           WALLET: ${{ steps.check.outputs.wallet }}
         run: |
-          node -e "
+          node <<'NODE'
           const { ethers } = require('ethers');
+          const fs = require('fs');
+
           (async () => {
             const abi = [
               'function onPROpen(address wallet)',
@@ -75,9 +77,13 @@ jobs:
             const tx = await vault.onPROpen(process.env.WALLET);
             await tx.wait();
             const count = await vault.openPRCount(process.env.WALLET);
-            require('fs').appendFileSync(process.env.GITHUB_OUTPUT, `count=${count.toString()}\n`);
-          })().catch((e) => { console.error(e); process.exit(1); });
-          "
+
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, 'count=' + count.toString() + '\n');
+          })().catch((e) => {
+            console.error(e);
+            process.exit(1);
+          });
+          NODE
 
       - name: Comment slot usage
         if: github.event.action == 'opened' && steps.check.outputs.eligible == 'true'
@@ -100,8 +106,9 @@ jobs:
           VAULT_ADDRESS: ${{ vars.VAULT_ADDRESS }}
           WALLET: ${{ steps.check.outputs.wallet }}
         run: |
-          node -e "
+          node <<'NODE'
           const { ethers } = require('ethers');
+
           (async () => {
             const abi = [
               'function onPRClose(address wallet)',
@@ -115,5 +122,8 @@ jobs:
               const tx = await vault.onPRClose(process.env.WALLET);
               await tx.wait();
             }
-          })().catch((e) => { console.error(e); process.exit(1); });
-          "
+          })().catch((e) => {
+            console.error(e);
+            process.exit(1);
+          });
+          NODE
